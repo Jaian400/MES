@@ -11,12 +11,19 @@ class ElemUniv:
         self.dN_dksi = np.zeros((self.npc, 4))
         self.dN_deta = np.zeros((self.npc, 4))
 
+        self.w_pc_outer = []
+
     def calculate_elem_univ(self):
         if self.npc_1d == 2:
             x = [-1.0 / np.sqrt(3.0), 1.0 / np.sqrt(3.0)]
+            w = [1.0, 1.0]
+            self.w_pc_outer = np.outer(w, w).flatten()
         elif self.npc_1d == 3:
             x = [-np.sqrt(3.0/5.0), 0.0, np.sqrt(3.0/5.0)]
+            w = [5/9, 8/9, 5/9]
+            self.w_pc_outer = np.outer(w, w).flatten()
         
+        # print(f"self.w_pc_outer {self.w_pc_outer}")
         # kazdy obrot to kolejny punkt calkowania; count bedzie 4 dla siatki 2 oraz 9 dla siatki 3
         pc_count = 0
 
@@ -68,8 +75,7 @@ class Jacobian:
         self.J1 = np.linalg.inv(self.J)
     
     def __repr__(self):
-        return f"\n--- JACOBIAN ---\n{self.J}\nWyznacznik: {self.detJ}" + f"\n--- JACOBIAN ODWROTNY ---\n{self.J1}\n"
-
+        return f"\n--- JACOBIAN ---\n{self.J}\nDET: {self.detJ}\n\n--- JACOBIAN ODWROTNY ---\n{self.J1}\n"
 
 # platy
 class Element:
@@ -78,7 +84,9 @@ class Element:
         self.node_ids = [int(nid) for nid in node_ids]
         self.jacobians = [] # jeden jakobian dla kazdego punktu calkowania
         # jacobian nie zalezy od wezla tylko od zestawu wezlow
-    
+        # macierz H - przewodnosci cieplnej
+        self.H = np.zeros((4,4))
+
     def calculate_jacobians(self, nodes_all, elem_univ:ElemUniv):
         # uwaga id zaczyna sie od 1; tu mamy kolejne polozenia wezlow
         # mozna przekazac polozenia albo cale obiekty, ale latwiej chyba macierz coords
@@ -95,8 +103,23 @@ class Element:
             jacobian.calculate(dN_dksi_row, dN_deta_row, element_nodes_coords)
             self.jacobians.append(jacobian)
 
+    def calculate_H(self, k, elem_univ):
+        # j_count bedzie tyle co npc
+        for j_count,j in enumerate(self.jacobians):
+            dN_dksi = elem_univ.dN_dksi[j_count, :]
+            dN_deta = elem_univ.dN_deta[j_count, :] 
+
+            # uzywamy J1 odwrotnej -> te dN_dcos to bedzie jeden rzad
+            dN_dx = j.J1[0, 0] * dN_dksi + j.J1[0, 1] * dN_deta
+            dN_dy = j.J1[1, 0] * dN_dksi + j.J1[1, 1] * dN_deta
+            # print(f"wiersz {j_count}: {dN_dx, dN_dy}")
+
+            mala_h = elem_univ.w_pc_outer[j_count] * k * (np.outer(dN_dx, dN_dx) + np.outer(dN_dy, dN_dy)) * j.detJ
+            # print(f"Mala macierz {j_count}: {mala_h}\n")
+            self.H += mala_h
+        
     def __repr__(self):
-        return f"\nElement(ID: {self.id}, Node IDs: {self.node_ids})\n" + f"{self.jacobians}\n"
+        return f"\nElement(ID: {self.id}, Node IDs: {self.node_ids})\n" + f"{self.jacobians}\n\nH:\n{self.H}\n"
 
 # pelna siatka - wszystko wszedzie naraz
 class Grid:
@@ -107,9 +130,10 @@ class Grid:
         self.elements:Element = [] 
         self.bc_nodes = [] # nunerki warunkow brzegowych
 
-    def calculate_jacobians_all(self, elem_univ):
+    def calculate_elements(self, elem_univ, cond):
         for e in self.elements:
             e.calculate_jacobians(self.nodes, elem_univ)
+            e.calculate_H(cond, elem_univ)
 
 # dane 
 class GlobalData:
@@ -185,7 +209,7 @@ def load_data(file_path):
                     grid.elements.append(Element(elem_id, node_ids_for_element))
 
                 elif reading_bc:
-                    # bolder condition
+                    # border condition
                     parts = line.replace(',', ' ').split()
                     grid.bc_nodes = [int(p) for p in parts]
                     reading_bc = False
@@ -203,8 +227,8 @@ def load_data(file_path):
 
 if __name__ == "__main__":
 
-    # file_path = "Test1_4_4.txt"  
-    file_path = "Test2_4_4_MixGrid.txt"
+    file_path = "Test1_4_4.txt"  
+    # file_path = "Test2_4_4_MixGrid.txt"
     # file_path = "Test3_31_31_kwadrat.txt"
 
     global_data, grid_data = load_data(file_path)
@@ -218,7 +242,6 @@ if __name__ == "__main__":
     global_data.npc = npc
 
     if global_data and grid_data:
-
         print("\n--- WSPÓŁRZĘDNE WSZYSTKICH WĘZŁÓW ---")
         for node_obj in grid_data.nodes:
             print(f"Węzeł ID: {node_obj.id}, Współrzędne (X, Y): ({node_obj.x}, {node_obj.y})")
@@ -239,8 +262,8 @@ if __name__ == "__main__":
 
     print(elem_univ)
 
-    grid_data.calculate_jacobians_all(elem_univ)
-    # print(e in grid_data.elements)
+    grid_data.calculate_elements(elem_univ, global_data.Conductivity)
+    print(grid_data.elements)
 
     # visualize_grid(grid_data)
     exit(0)
