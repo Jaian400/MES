@@ -149,6 +149,11 @@ class GlobalData:
 
         self.npc = 2 # zakladamy ze odnosi sie do 1d
 
+#agregacja
+class MatrixH:
+    def __init__(self):
+        pass
+
 def load_data(file_path):
     try:     
         with open(file_path, 'r') as file:
