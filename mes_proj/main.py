@@ -2,6 +2,7 @@ import numpy as np
 from integrate import V_ff
 from visualize_grid import visualize_grid
 from scipy.integrate import dblquad
+from tabulate import tabulate
 
 # tabelka ksi(smieszne E) oraz eta(smieszne n)
 class ElemUniv:
@@ -151,8 +152,20 @@ class GlobalData:
 
 #agregacja
 class MatrixH:
-    def __init__(self):
-        pass
+    def __init__(self, num_nodes):
+        self.H = np.zeros((num_nodes, num_nodes))
+    
+    def calculate(self, elements):
+        for e in elements:
+            small_H = e.H
+            for i in range(4):
+                for j in range(4):
+                    self.H[e.node_ids[i] - 1][e.node_ids[j] - 1] += small_H[i][j]
+
+    def __repr__(self):
+        result = "\nMacierz duza H:\n"
+        result += tabulate(self.H, floatfmt=".3f", tablefmt="plain")
+        return result
 
 def load_data(file_path):
     try:     
@@ -270,6 +283,11 @@ if __name__ == "__main__":
     grid_data.calculate_elements(elem_univ, global_data.Conductivity)
     print(grid_data.elements)
 
+
+    matrix_H = MatrixH(grid_data.nN)
+    matrix_H.calculate(grid_data.elements)
+    print(matrix_H)
+    
     # visualize_grid(grid_data)
     exit(0)
 
