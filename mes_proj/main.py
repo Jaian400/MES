@@ -6,6 +6,13 @@ from tabulate import tabulate
 
 # tabelka ksi(smieszne E) oraz eta(smieszne n)
 class ElemUniv:
+    class Surface:
+        def __init__(self, npc):
+            self.N = np.array((npc, 4))
+        
+        def calculate_surface():
+            pass
+    
     def __init__(self, npc):
         self.npc_1d = npc
         self.npc = npc * npc 
@@ -13,6 +20,8 @@ class ElemUniv:
         self.dN_deta = np.zeros((self.npc, 4))
 
         self.w_pc_outer = []
+
+        self.surface = np.array((4))
 
     def calculate_elem_univ(self):
         if self.npc_1d == 2:
@@ -23,6 +32,8 @@ class ElemUniv:
             x = [-np.sqrt(3.0/5.0), 0.0, np.sqrt(3.0/5.0)]
             w = [5/9, 8/9, 5/9]
             self.w_pc_outer = np.outer(w, w).flatten()
+        elif self.npc_1d == 4:
+            pass # dolozyc schemat
         
         # print(f"self.w_pc_outer {self.w_pc_outer}")
         # kazdy obrot to kolejny punkt calkowania; count bedzie 4 dla siatki 2 oraz 9 dla siatki 3
@@ -44,6 +55,8 @@ class ElemUniv:
                     0.25 * (1 - eta)
                 ]
                 pc_count += 1
+
+                # dodaj tu surface
     
     def __repr__(self):
         return f"\n--- ELEMENT UNIWERSALNY ---\nKSI:\n{self.dN_dksi}\nETA:\n{self.dN_deta}"
@@ -54,6 +67,7 @@ class Node:
         self.id = int(node_id)
         self.x = float(x)
         self.y = float(y)
+        self.BC = False
 
     def __repr__(self):
         return f"Node(ID: {self.id}, X: {self.x}, Y: {self.y})"
@@ -87,6 +101,7 @@ class Element:
         # jacobian nie zalezy od wezla tylko od zestawu wezlow
         # macierz H - przewodnosci cieplnej
         self.H = np.zeros((4,4))
+        self.Hbc = np.zeros((4,4))
 
     def calculate_jacobians(self, nodes_all, elem_univ:ElemUniv):
         # uwaga id zaczyna sie od 1; tu mamy kolejne polozenia wezlow
@@ -105,7 +120,7 @@ class Element:
             self.jacobians.append(jacobian)
 
     def calculate_H(self, k, elem_univ):
-        # j_count bedzie tyle co npc
+        # j_count bedzie tyle co npc - czemu nie i? jacobian
         for j_count,j in enumerate(self.jacobians):
             dN_dksi = elem_univ.dN_dksi[j_count, :]
             dN_deta = elem_univ.dN_deta[j_count, :] 
@@ -118,7 +133,12 @@ class Element:
             mala_h = elem_univ.w_pc_outer[j_count] * k * (np.outer(dN_dx, dN_dx) + np.outer(dN_dy, dN_dy)) * j.detJ
             # print(f"Mala macierz {j_count}: {mala_h}\n")
             self.H += mala_h
-        
+    
+    def calculate_Hbc(self, elem_univ, bc_nodes):
+        for j_count,j in enumerate(self.jacobians):
+            if self.node_ids[j_count] not in bc_nodes:
+                continue
+       
     def __repr__(self):
         return f"\nElement(ID: {self.id}, Node IDs: {self.node_ids})\n" + f"{self.jacobians}\n\nH:\n{self.H}\n"
 
@@ -166,6 +186,9 @@ class MatrixH:
         result = "\nMacierz duza H:\n"
         result += tabulate(self.H, floatfmt=".3f", tablefmt="plain")
         return result
+
+#class #
+ # napisac funkcje do rozwiazania ukladu rownan   
 
 def load_data(file_path):
     try:     
@@ -232,6 +255,9 @@ def load_data(file_path):
                     grid.bc_nodes = [int(p) for p in parts]
                     reading_bc = False
 
+            for n in grid.nodes:
+                if n.id in grid.bc_nodes:
+                    n.BC = True
 
             return gb, grid
 
@@ -252,8 +278,9 @@ if __name__ == "__main__":
     global_data, grid_data = load_data(file_path)
 
     try:
-        npc = int(input("Schemat calkowania (2 lub 3, domyślnie 2): "))
-        if npc not in [2, 3]: npc = 2
+        npc = int(input("Schemat calkowania (2 lub 3 lub 4, domyślnie 2): "))
+        if npc not in [2, 3, 4]: 
+            npc = 2
     except ValueError:
         npc = 2
 
