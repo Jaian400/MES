@@ -4,15 +4,52 @@ from visualize_grid import visualize_grid
 from scipy.integrate import dblquad
 from tabulate import tabulate
 
+# stworz klase schemat calkowania z ktorej beda dziedziczyc Surface i ElemUniv, bo od tego co jest teraz oczy bola
+
+class Surface:
+    def __init__(self, npc, position):
+        self.N = np.zeros((npc, 4))
+        self.npc_1d = npc
+        # self.dN_dksi = np.zeros((self.npc, 4))
+        # self.dN_deta = np.zeros((self.npc, 4))
+        self.position = position
+        self.w = []
+    
+    # zerowac beda sie te ktorych dana sciana nie dotyka
+    def calculate_surface(self):
+        if self.npc_1d == 2:
+            x = [-1.0 / np.sqrt(3.0), 1.0 / np.sqrt(3.0)]
+            self.w = [1.0, 1.0]
+        elif self.npc_1d == 3:
+            x = [-np.sqrt(3.0/5.0), 0.0, np.sqrt(3.0/5.0)]
+            self.w = [5/9, 8/9, 5/9]
+        elif self.npc_1d == 4:
+            pass # dolozyc schemat
+        
+        for i, xi in enumerate(x):
+            if self.position == 0:
+                ksi = xi
+                eta = -1
+            elif self.position == 1:
+                ksi = 1
+                eta = xi
+            elif self.position == 2:
+                ksi = xi
+                eta = 1
+            elif self.position == 3:
+                ksi = -1
+                eta = xi
+
+            self.N[i, 0] = 0.25 * (1 - ksi) * (1 - eta)
+            self.N[i, 1] = 0.25 * (1 + ksi) * (1 - eta)
+            self.N[i, 2] = 0.25 * (1 + ksi) * (1 + eta)
+            self.N[i, 3] = 0.25 * (1 - ksi) * (1 + eta)
+    
+    def __repr__(self):
+        return f"dN: {self.N}\n w = {self.w}\n"
+
 # tabelka ksi(smieszne E) oraz eta(smieszne n)
 class ElemUniv:
-    class Surface:
-        def __init__(self, npc):
-            self.N = np.array((npc, 4))
-        
-        def calculate_surface():
-            pass
-    
     def __init__(self, npc):
         self.npc_1d = npc
         self.npc = npc * npc 
@@ -21,7 +58,7 @@ class ElemUniv:
 
         self.w_pc_outer = []
 
-        self.surface = np.array((4))
+        self.surfaces = []
 
     def calculate_elem_univ(self):
         if self.npc_1d == 2:
@@ -55,8 +92,10 @@ class ElemUniv:
                     0.25 * (1 - eta)
                 ]
                 pc_count += 1
-
-                # dodaj tu surface
+        
+        for i in range(4):
+            self.surfaces.append(Surface(self.npc_1d, i))
+            self.surfaces[i].calculate_surface()
     
     def __repr__(self):
         return f"\n--- ELEMENT UNIWERSALNY ---\nKSI:\n{self.dN_dksi}\nETA:\n{self.dN_deta}"
@@ -134,13 +173,26 @@ class Element:
             # print(f"Mala macierz {j_count}: {mala_h}\n")
             self.H += mala_h
     
-    def calculate_Hbc(self, elem_univ, bc_nodes):
-        for j_count,j in enumerate(self.jacobians):
-            if self.node_ids[j_count] not in bc_nodes:
+    def calculate_Hbc(self, alfa, elem_univ, nodes_all):
+        walls = [(0, 1), (1, 2), (2, 3), (3, 0)]
+        # a zawsze beda 2 na sciane bo to czworokat
+        for i,wall in enumerate(walls):
+            node1 = nodes_all[self.node_ids[wall[0]] - 1]
+            node2 = nodes_all[self.node_ids[wall[1]] - 1]
+
+            if not node1.BC or not node2.BC:
                 continue
-       
+            
+            detJ = 0.5 * np.sqrt(np.pow((node1.x - node2.x), 2) + np.pow((node1.y - node2.y), 2))
+            surface = elem_univ.surfaces[i]
+            print(surface)
+
+            for j, w in enumerate(surface.w): # dla kazdego punktu calkowania
+                mala_Hbc = alfa * w * np.outer(surface.N[j], surface.N[j]) * detJ
+                self.Hbc += mala_Hbc
+        
     def __repr__(self):
-        return f"\nElement(ID: {self.id}, Node IDs: {self.node_ids})\n" + f"{self.jacobians}\n\nH:\n{self.H}\n"
+        return f"\nElement(ID: {self.id}, Node IDs: {self.node_ids})\n" + f"{self.jacobians}\n\nH:\n{self.H}\n\nHbc:\n{self.Hbc}\n"
 
 # pelna siatka - wszystko wszedzie naraz
 class Grid:
@@ -151,10 +203,11 @@ class Grid:
         self.elements:Element = [] 
         self.bc_nodes = [] # nunerki warunkow brzegowych
 
-    def calculate_elements(self, elem_univ, cond):
+    def calculate_elements(self, elem_univ, cond, alfa):
         for e in self.elements:
             e.calculate_jacobians(self.nodes, elem_univ)
             e.calculate_H(cond, elem_univ)
+            e.calculate_Hbc(alfa, elem_univ, self.nodes)
 
 # dane 
 class GlobalData:
@@ -295,7 +348,7 @@ if __name__ == "__main__":
         for elem_obj in grid_data.elements:
             print(f"Element ID: {elem_obj.id}, ID węzłów: {elem_obj.node_ids}")
 
-        print("\n\n--- BOLDING CONDITION ---")
+        print("\n\n--- BORDER CONDITION ---")
         for abc in grid_data.bc_nodes:
             print(f"{abc}")
     else:
@@ -307,9 +360,8 @@ if __name__ == "__main__":
 
     print(elem_univ)
 
-    grid_data.calculate_elements(elem_univ, global_data.Conductivity)
+    grid_data.calculate_elements(elem_univ, global_data.Conductivity, global_data.Alfa)
     print(grid_data.elements)
-
 
     matrix_H = MatrixH(grid_data.nN)
     matrix_H.calculate(grid_data.elements)
