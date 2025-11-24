@@ -141,6 +141,7 @@ class Element:
         # macierz H - przewodnosci cieplnej
         self.H = np.zeros((4,4))
         self.Hbc = np.zeros((4,4))
+        self.P = np.zeros((4))
 
     def calculate_jacobians(self, nodes_all, elem_univ:ElemUniv):
         # uwaga id zaczyna sie od 1; tu mamy kolejne polozenia wezlow
@@ -173,7 +174,7 @@ class Element:
             # print(f"Mala macierz {j_count}: {mala_h}\n")
             self.H += mala_h
     
-    def calculate_Hbc(self, alfa, elem_univ, nodes_all):
+    def calculate_Hbc(self, alfa, elem_univ, nodes_all, t_ot):
         walls = [(0, 1), (1, 2), (2, 3), (3, 0)]
         # a zawsze beda 2 na sciane bo to czworokat
         for i,wall in enumerate(walls):
@@ -188,11 +189,16 @@ class Element:
             print(surface)
 
             for j, w in enumerate(surface.w): # dla kazdego punktu calkowania
-                mala_Hbc = alfa * w * np.outer(surface.N[j], surface.N[j]) * detJ
-                self.Hbc += mala_Hbc
+                self.Hbc += alfa * w * np.outer(surface.N[j], surface.N[j]) * detJ
+                # if node1.x == 0 and node2.x == 0:
+                #     self.P += alfa * w * surface.N[j] * 200 * detJ
+                #     continue
+                self.P += alfa * w * surface.N[j] * t_ot * detJ
+ 
+        self.H += self.Hbc
         
     def __repr__(self):
-        return f"\nElement(ID: {self.id}, Node IDs: {self.node_ids})\n" + f"{self.jacobians}\n\nH:\n{self.H}\n\nHbc:\n{self.Hbc}\n"
+        return f"\nElement(ID: {self.id}, Node IDs: {self.node_ids})\n" + f"{self.jacobians}\n\nH:\n{self.H}\n\nHbc:\n{self.Hbc}\n\n{self.P}\n"
 
 # pelna siatka - wszystko wszedzie naraz
 class Grid:
@@ -203,11 +209,11 @@ class Grid:
         self.elements:Element = [] 
         self.bc_nodes = [] # nunerki warunkow brzegowych
 
-    def calculate_elements(self, elem_univ, cond, alfa):
+    def calculate_elements(self, elem_univ, cond, alfa, t_ot):
         for e in self.elements:
             e.calculate_jacobians(self.nodes, elem_univ)
             e.calculate_H(cond, elem_univ)
-            e.calculate_Hbc(alfa, elem_univ, self.nodes)
+            e.calculate_Hbc(alfa, elem_univ, self.nodes, t_ot)
 
 # dane 
 class GlobalData:
@@ -227,21 +233,35 @@ class GlobalData:
 class MatrixH:
     def __init__(self, num_nodes):
         self.H = np.zeros((num_nodes, num_nodes))
+        self.P = np.zeros((num_nodes))
     
     def calculate(self, elements):
         for e in elements:
             small_H = e.H
+            small_P = e.P
             for i in range(4):
                 for j in range(4):
                     self.H[e.node_ids[i] - 1][e.node_ids[j] - 1] += small_H[i][j]
+                
+                self.P[e.node_ids[i] - 1] += small_P[i]
 
     def __repr__(self):
         result = "\nMacierz duza H:\n"
         result += tabulate(self.H, floatfmt=".3f", tablefmt="plain")
+        result += f"\nMacierz duza P:\n{self.P}\n"
         return result
 
-#class #
- # napisac funkcje do rozwiazania ukladu rownan   
+class SystemOfEquation:
+    def __init__(self, matrix_H, nN):
+        self.H = matrix_H.H
+        self.P = matrix_H.P
+        self.t = np.zeros(nN)
+    
+    def solve(self):
+        self.t = np.linalg.solve(self.H, self.P)
+    
+    def __repr__(self):
+        return f"\nMacierz temperatur: {self.t}\n"
 
 def load_data(file_path):
     try:     
@@ -360,13 +380,22 @@ if __name__ == "__main__":
 
     print(elem_univ)
 
-    grid_data.calculate_elements(elem_univ, global_data.Conductivity, global_data.Alfa)
+    # lekka modyfikacja
+    # grid_data.nodes[1].BC = False
+    # grid_data.nodes[2].BC = False
+    # grid_data.nodes[13].BC = False
+    # grid_data.nodes[14].BC = False
+
+    grid_data.calculate_elements(elem_univ, global_data.Conductivity, global_data.Alfa, global_data.Tot)
     print(grid_data.elements)
 
     matrix_H = MatrixH(grid_data.nN)
     matrix_H.calculate(grid_data.elements)
     print(matrix_H)
     
+    system_of_equation = SystemOfEquation(matrix_H, grid_data.nN)
+    system_of_equation.solve()
+    print(system_of_equation)
     # visualize_grid(grid_data)
     exit(0)
 
