@@ -55,6 +55,7 @@ class ElemUniv:
         self.npc = npc * npc 
         self.dN_dksi = np.zeros((self.npc, 4))
         self.dN_deta = np.zeros((self.npc, 4))
+        self.N = np.zeros((self.npc, 4))
 
         self.w_pc_outer = []
 
@@ -91,6 +92,12 @@ class ElemUniv:
                     0.25 * (1 + eta),
                     0.25 * (1 - eta)
                 ]
+
+                self.N[pc_count, 0] = 0.25 * (1 - ksi) * (1 - eta)
+                self.N[pc_count, 1] = 0.25 * (1 + ksi) * (1 - eta)
+                self.N[pc_count, 2] = 0.25 * (1 + ksi) * (1 + eta)
+                self.N[pc_count, 3] = 0.25 * (1 - ksi) * (1 + eta)
+
                 pc_count += 1
         
         for i in range(4):
@@ -142,8 +149,10 @@ class Element:
         self.H = np.zeros((4,4))
         self.Hbc = np.zeros((4,4))
         self.P = np.zeros((4))
+        self.C = np.zeros((4,4))
 
     def calculate_jacobians(self, nodes_all, elem_univ:ElemUniv):
+        self.jacobians.clear()
         # uwaga id zaczyna sie od 1; tu mamy kolejne polozenia wezlow
         # mozna przekazac polozenia albo cale obiekty, ale latwiej chyba macierz coords
         element_nodes_coords = np.array([
@@ -159,7 +168,8 @@ class Element:
             jacobian.calculate(dN_dksi_row, dN_deta_row, element_nodes_coords)
             self.jacobians.append(jacobian)
 
-    def calculate_H(self, k, elem_univ):
+    def calculate_H(self, k, elem_univ, dens, spec_heat):
+        self.H = np.zeros((4, 4))
         # j_count bedzie tyle co npc - czemu nie i? jacobian
         for j_count,j in enumerate(self.jacobians):
             dN_dksi = elem_univ.dN_dksi[j_count, :]
@@ -173,6 +183,8 @@ class Element:
             mala_h = elem_univ.w_pc_outer[j_count] * k * (np.outer(dN_dx, dN_dx) + np.outer(dN_dy, dN_dy)) * j.detJ
             # print(f"Mala macierz {j_count}: {mala_h}\n")
             self.H += mala_h
+
+            self.C += elem_univ.w_pc_outer[j_count] * dens * spec_heat * (np.outer(elem_univ.N[j_count, :], elem_univ.N[j_count, :])) * j.detJ
     
     def calculate_Hbc(self, alfa, elem_univ, nodes_all, t_ot):
         walls = [(0, 1), (1, 2), (2, 3), (3, 0)]
@@ -186,7 +198,7 @@ class Element:
             
             detJ = 0.5 * np.sqrt(np.pow((node1.x - node2.x), 2) + np.pow((node1.y - node2.y), 2))
             surface = elem_univ.surfaces[i]
-            print(surface)
+            # print(surface)
 
             for j, w in enumerate(surface.w): # dla kazdego punktu calkowania
                 self.Hbc += alfa * w * np.outer(surface.N[j], surface.N[j]) * detJ
@@ -209,10 +221,10 @@ class Grid:
         self.elements:Element = [] 
         self.bc_nodes = [] # nunerki warunkow brzegowych
 
-    def calculate_elements(self, elem_univ, cond, alfa, t_ot):
+    def calculate_elements(self, elem_univ, cond, alfa, t_ot, dens, spec_heat):
         for e in self.elements:
             e.calculate_jacobians(self.nodes, elem_univ)
-            e.calculate_H(cond, elem_univ)
+            e.calculate_H(cond, elem_univ, dens, spec_heat)
             e.calculate_Hbc(alfa, elem_univ, self.nodes, t_ot)
 
 # dane 
@@ -234,14 +246,17 @@ class MatrixH:
     def __init__(self, num_nodes):
         self.H = np.zeros((num_nodes, num_nodes))
         self.P = np.zeros((num_nodes))
+        self.C = np.zeros((num_nodes, num_nodes))
     
     def calculate(self, elements):
         for e in elements:
             small_H = e.H
             small_P = e.P
+            small_C = e.C
             for i in range(4):
                 for j in range(4):
                     self.H[e.node_ids[i] - 1][e.node_ids[j] - 1] += small_H[i][j]
+                    self.C[e.node_ids[i] - 1][e.node_ids[j] - 1] += small_C[i][j]
                 
                 self.P[e.node_ids[i] - 1] += small_P[i]
 
@@ -249,19 +264,29 @@ class MatrixH:
         result = "\nMacierz duza H:\n"
         result += tabulate(self.H, floatfmt=".3f", tablefmt="plain")
         result += f"\nMacierz duza P:\n{self.P}\n"
+        result += "\nMacierz duza C:\n"
+        result += tabulate(self.C, floatfmt=".3f", tablefmt="plain")
+
         return result
 
 class SystemOfEquation:
     def __init__(self, matrix_H, nN):
         self.H = matrix_H.H
         self.P = matrix_H.P
+        self.C = matrix_H.C
         self.t = np.zeros(nN)
     
-    def solve(self):
-        self.t = np.linalg.solve(self.H, self.P)
+    def solve(self, t0, delta_tau):
+        print(t0)
+        new_C = self.C / delta_tau
+        left = self.H + new_C
+        print(f"{left}")
+        right = self.P + np.inner(t0, new_C)
+        print(f"{right}")
+        self.t = np.linalg.solve(left, right)
     
     def __repr__(self):
-        return f"\nMacierz temperatur: {self.t}\n"
+        return f"\nt1: {self.t}\n"
 
 def load_data(file_path):
     try:     
@@ -341,6 +366,17 @@ def load_data(file_path):
         print(f"Wystąpił nieoczekiwany błąd: {e}")
         return None, None
 
+def calculate_state(grid_data, elem_univ, global_data, t0):
+    grid_data.calculate_elements(elem_univ, global_data.Conductivity, global_data.Alfa, global_data.Tot, global_data.Density, global_data.SpecificHeat)
+    # print(grid_data.elements)
+
+    matrix_H = MatrixH(grid_data.nN)
+    matrix_H.calculate(grid_data.elements)
+    # print(matrix_H)
+    
+    system_of_equation = SystemOfEquation(matrix_H, grid_data.nN)
+    system_of_equation.solve(t0, global_data.SimulationStepTime)
+    print(system_of_equation)
 
 if __name__ == "__main__":
 
@@ -378,24 +414,21 @@ if __name__ == "__main__":
     elem_univ = ElemUniv(global_data.npc)
     elem_univ.calculate_elem_univ()
 
-    print(elem_univ)
+    # print(elem_univ)
 
     # lekka modyfikacja
     # grid_data.nodes[1].BC = False
     # grid_data.nodes[2].BC = False
     # grid_data.nodes[13].BC = False
     # grid_data.nodes[14].BC = False
-
-    grid_data.calculate_elements(elem_univ, global_data.Conductivity, global_data.Alfa, global_data.Tot)
-    print(grid_data.elements)
-
-    matrix_H = MatrixH(grid_data.nN)
-    matrix_H.calculate(grid_data.elements)
-    print(matrix_H)
     
-    system_of_equation = SystemOfEquation(matrix_H, grid_data.nN)
-    system_of_equation.solve()
-    print(system_of_equation)
+    taus = range(0, global_data.SimulationTime, global_data.SimulationStepTime)
+    t0 = np.ones((grid_data.nN)) * global_data.InitialTemp
+
+    for _ in taus:
+        calculate_state(grid_data, elem_univ, global_data, t0)
+        exit(0)
+
     # visualize_grid(grid_data)
     exit(0)
 
