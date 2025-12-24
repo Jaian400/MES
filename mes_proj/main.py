@@ -2,11 +2,15 @@ import numpy as np
 from integrate import V_ff
 from visualize_grid import visualize_grid
 from scipy.integrate import dblquad
+from scipy.sparse import csc_array, csr_array
+from scipy.sparse.linalg import spsolve
 from tabulate import tabulate
 
 from Global import global_data, grid_data
 from load_data import load_data
 from ElemUniv import ElemUniv
+
+import time
 
 #agregacja
 class MatrixGlobal:
@@ -51,6 +55,7 @@ class SystemOfEquation:
         right = self.P + np.inner(t0, new_C)
         # print(f"{right}")
         self.t = np.linalg.solve(left, right)
+        # self.t = spsolve(csc_array(left), csr_array(right))
     
     def __repr__(self):
         return f"\nt1: {self.t}\n"
@@ -71,15 +76,14 @@ def calculate_state(elem_univ, t0):
     
     system_of_equation = SystemOfEquation(matrixes, grid_data.nN)
     system_of_equation.solve(t0, global_data.SimulationStepTime)
-    print(system_of_equation)
+    # print(system_of_equation)
 
     return system_of_equation.t
 
 if __name__ == "__main__":
-
-    file_path = "Test1_4_4.txt"  
+    # file_path = "Test1_4_4.txt"  
     # file_path = "Test2_4_4_MixGrid.txt"
-    # file_path = "Test3_31_31_kwadrat.txt"
+    file_path = "Test3_31_31_kwadrat.txt"
 
     load_data(file_path)
 
@@ -121,10 +125,15 @@ if __name__ == "__main__":
     
     taus = range(0, global_data.SimulationTime, global_data.SimulationStepTime)
     t0 = np.ones((grid_data.nN)) * global_data.InitialTemp
-
+     
+    start = time.time()
     for tau in taus:
-        print(f"\n-------------{tau+global_data.SimulationStepTime}s----------------\n")
+        # print(f"\n-------------{tau+global_data.SimulationStepTime}s----------------\n")
         t0 = calculate_state(elem_univ, t0)
+        # print(f"{tau+global_data.SimulationStepTime:02} s | Max: {t0.max():.5f} | Min: {t0.min():.5f}")
+    end = time.time()
+
+    print("Czas obliczeń:", end - start, "s")
 
     # visualize_grid(grid_data)
     exit(0)

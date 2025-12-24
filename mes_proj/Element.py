@@ -8,7 +8,6 @@ class Jacobian:
         self.detJ = 0.0
 
     def calculate(self, dN_dksi_row, dN_deta_row, element_nodes_coords):
-        # dot -> iloczyn skalarny; sum(element wiersza pc razy koordy po x(0) i potem y(1)) 
         self.J[0, 0] = np.dot(dN_dksi_row, element_nodes_coords[:, 0]) # lewy gorny - x po ksi
         self.J[0, 1] = np.dot(dN_dksi_row, element_nodes_coords[:, 1]) # prawy gorny - y po ksi
 
@@ -26,9 +25,7 @@ class Element:
     def __init__(self, element_id, node_ids):
         self.id = int(element_id)
         self.node_ids = [int(nid) for nid in node_ids]
-        self.jacobians = [] # jeden jakobian dla kazdego punktu calkowania
-        # jacobian nie zalezy od wezla tylko od zestawu wezlow
-        # macierz H - przewodnosci cieplnej
+        self.jacobians = [] 
         self.H = np.zeros((4,4))
         self.Hbc = np.zeros((4,4))
         self.P = np.zeros((4))
@@ -37,7 +34,6 @@ class Element:
     def calculate_jacobians(self, nodes_all, elem_univ:ElemUniv):
         self.jacobians.clear()
         # uwaga id zaczyna sie od 1; tu mamy kolejne polozenia wezlow
-        # mozna przekazac polozenia albo cale obiekty, ale latwiej chyba macierz coords
         element_nodes_coords = np.array([
             [nodes_all[node_id - 1].x, nodes_all[node_id - 1].y] 
             for node_id in self.node_ids
@@ -55,12 +51,10 @@ class Element:
         self.H = np.zeros((4, 4))
         self.C = np.zeros((4, 4))
 
-        # j_count bedzie tyle co npc - czemu nie i? jacobian
         for j_count,j in enumerate(self.jacobians):
             dN_dksi = elem_univ.dN_dksi[j_count, :]
             dN_deta = elem_univ.dN_deta[j_count, :] 
 
-            # uzywamy J1 odwrotnej -> te dN_dcos to bedzie jeden rzad
             dN_dx = j.J1[0, 0] * dN_dksi + j.J1[0, 1] * dN_deta
             dN_dy = j.J1[1, 0] * dN_dksi + j.J1[1, 1] * dN_deta
             # print(f"wiersz {j_count}: {dN_dx, dN_dy}")
