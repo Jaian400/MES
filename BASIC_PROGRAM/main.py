@@ -130,7 +130,7 @@ if __name__ == "__main__":
     for tau in taus:
         # print(f"\n-------------{tau+global_data.SimulationStepTime}s----------------\n")
         t0 = calculate_state(elem_univ, t0)
-        # print(f"{tau+global_data.SimulationStepTime:02} s | Max: {t0.max():.5f} | Min: {t0.min():.5f}")
+        print(f"{tau+global_data.SimulationStepTime:02} s | Max: {t0.max():.5f} | Min: {t0.min():.5f}")
     end = time.time()
 
     print("Czas obliczeń:", end - start, "s")
