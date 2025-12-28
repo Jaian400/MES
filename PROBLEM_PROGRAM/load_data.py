@@ -70,13 +70,13 @@ def load_data(file_path):
                 elif reading_bc:
                     # border condition
                     parts = line.replace(',', ' ').split()
-                    grid_data.bc_nodes = [int(p) for p in parts]
-                    reading_bc = False
+                    for p in parts:
+                        grid_data.bc_nodes.append(int(p))
                 
                 elif reading_e_gen:
                     parts = line.replace(',', ' ').split()
                     for p in parts:
-                        grid_data.elements[int(p)].Q_gen = 100
+                        grid_data.elements[int(p) - 1].Q_gen = 100
 
             for n in grid_data.nodes:
                 if n.id in grid_data.bc_nodes:

@@ -1,6 +1,7 @@
 import numpy as np
 from integrate import V_ff
 from visualize_grid import visualize_grid
+from visualize_heatmap import visualize_heatmap
 from scipy.integrate import dblquad
 from scipy.sparse import csc_array, csr_array
 from scipy.sparse.linalg import spsolve
@@ -86,17 +87,10 @@ def calculate_state(elem_univ, t0):
     return system_of_equation.t
 
 if __name__ == "__main__":
-    file_path = "Test_q_gen_big.txt"
+    # file_path = "Test_q_gen_big.txt"
     file_path = "Test_q_gen.txt"
 
     load_data(file_path)
-
-    # try:
-    #     npc = int(input("Schemat calkowania (2 lub 3 lub 4, domyślnie 2): "))
-    #     if npc not in [2, 3, 4]: 
-    #         npc = 2
-    # except ValueError:
-    #     npc = 2
 
     npc = 2
     global_data.npc = npc
@@ -120,13 +114,7 @@ if __name__ == "__main__":
     elem_univ = ElemUniv(global_data.npc)
     elem_univ.calculate_elem_univ()
 
-    # print(elem_univ)
-
-    # lekka modyfikacja
-    # grid_data.nodes[1].BC = False
-    # grid_data.nodes[2].BC = False
-    # grid_data.nodes[13].BC = False
-    # grid_data.nodes[14].BC = False
+    # print(elem_univ)E
     
     taus = range(0, global_data.SimulationTime, global_data.SimulationStepTime)
     t0 = np.ones((grid_data.nN)) * global_data.InitialTemp
@@ -141,17 +129,18 @@ if __name__ == "__main__":
     print("Czas obliczeń:", end - start, "s")
 
     # visualize_grid(grid_data)
+    visualize_heatmap(grid_data, t0)
     exit(0)
 
-    print("\n\nCALKOWANIE")
-    calka = V_ff()
+    # print("\n\nCALKOWANIE")
+    # calka = V_ff()
 
-    f1 = lambda x:5*np.pow(x, 2) + 3*x + 6
-    f2 = lambda y, x: 5 * np.power(x,2) * np.power(y,2) + 3*x*y + 6
+    # f1 = lambda x:5*np.pow(x, 2) + 3*x + 6
+    # f2 = lambda y, x: 5 * np.power(x,2) * np.power(y,2) + 3*x*y + 6
 
-    calka.quadrature(f2, -1, 1)
-    print(calka.output)
+    # calka.quadrature(f2, -1, 1)
+    # print(calka.output)
 
-    dblquad_, error = dblquad(f2, -100, 100, lambda x: -1, lambda x: 2)
-    print(f"dblquad: {dblquad_}")
-    print(f"roznica miedzy V_ff a dblquad: {100 * abs(calka.output - dblquad_)/calka.output} %")
+    # dblquad_, error = dblquad(f2, -100, 100, lambda x: -1, lambda x: 2)
+    # print(f"dblquad: {dblquad_}")
+    # print(f"roznica miedzy V_ff a dblquad: {100 * abs(calka.output - dblquad_)/calka.output} %")
