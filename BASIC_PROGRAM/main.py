@@ -1,6 +1,7 @@
 import numpy as np
 from integrate import V_ff
 from visualize_grid import visualize_grid
+from visualize_heatmap import visualize_heatmap
 from scipy.integrate import dblquad
 from scipy.sparse import csc_array, csr_array
 from scipy.sparse.linalg import spsolve
@@ -66,14 +67,7 @@ def calculate_elements(elements, nodes, elem_univ, cond, alfa, t_ot, dens, spec_
         e.calculate_H(cond, elem_univ, dens, spec_heat)
         e.calculate_Hbc(alfa, elem_univ, nodes, t_ot)
 
-def calculate_state(elem_univ, t0):
-    calculate_elements(grid_data.elements, grid_data.nodes, elem_univ, global_data.Conductivity, global_data.Alfa, global_data.Tot, global_data.Density, global_data.SpecificHeat)
-    # print(grid_data.elements)
-
-    matrixes = MatrixGlobal()
-    matrixes.calculate()
-    # print(matrix_H)
-    
+def calculate_state(matrixes, t0):    
     system_of_equation = SystemOfEquation(matrixes, grid_data.nN)
     system_of_equation.solve(t0, global_data.SimulationStepTime)
     # print(system_of_equation)
@@ -112,6 +106,7 @@ if __name__ == "__main__":
         print("Nie otrzymano poprawnych danych z load_data\n")
         exit(-1)
     
+    start = time.time()
     elem_univ = ElemUniv(global_data.npc)
     elem_univ.calculate_elem_univ()
 
@@ -122,20 +117,27 @@ if __name__ == "__main__":
     # grid_data.nodes[2].BC = False
     # grid_data.nodes[13].BC = False
     # grid_data.nodes[14].BC = False
+
+    calculate_elements(grid_data.elements, grid_data.nodes, elem_univ, global_data.Conductivity, global_data.Alfa, global_data.Tot, global_data.Density, global_data.SpecificHeat)
+    # print(grid_data.elements)
+
+    matrixes = MatrixGlobal()
+    matrixes.calculate()
+    # print(matrix_H)
     
     taus = range(0, global_data.SimulationTime, global_data.SimulationStepTime)
     t0 = np.ones((grid_data.nN)) * global_data.InitialTemp
      
-    start = time.time()
     for tau in taus:
         # print(f"\n-------------{tau+global_data.SimulationStepTime}s----------------\n")
-        t0 = calculate_state(elem_univ, t0)
+        t0 = calculate_state(matrixes, t0)
         print(f"{tau+global_data.SimulationStepTime:02} s | Max: {t0.max():.5f} | Min: {t0.min():.5f}")
     end = time.time()
 
     print("Czas obliczeń:", end - start, "s")
 
     # visualize_grid(grid_data)
+    visualize_heatmap(grid_data, t0)
     exit(0)
 
     print("\n\nCALKOWANIE")

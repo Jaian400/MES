@@ -32,6 +32,8 @@ class Element:
         self.C = np.zeros((4,4))
         self.Q_gen = None
 
+        self.material_type = 0
+
     def calculate_jacobians(self, nodes_all, elem_univ:ElemUniv):
         self.jacobians.clear()
         # uwaga id zaczyna sie od 1; tu mamy kolejne polozenia wezlow
@@ -91,6 +93,11 @@ class Element:
                 self.P += alfa * w * surface.N[j] * t_ot * detJ
  
         self.H += self.Hbc
+
+    # WEWNETRZNE ZRODLO CIEPLA
+    def calculate_Q_gen(self, elem_univ):
+        for i, j in enumerate(self.jacobians):
+            self.P += self.Q_gen * elem_univ.N[i] * j.detJ * elem_univ.w_pc_outer[i]
         
     def __repr__(self):
         return f"\nElement(ID: {self.id}, Node IDs: {self.node_ids})\n" + f"{self.jacobians}\n\nH:\n{self.H}\n\nHbc:\n{self.Hbc}\n\n{self.P}\n"

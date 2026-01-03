@@ -11,7 +11,7 @@ class Node:
         self.BC = False
 
     def __repr__(self):
-        return f"Node(ID: {self.id}, X: {self.x}, Y: {self.y})"
+        return f"Node(ID: {self.id}, X: {self.x}, Y: {self.y}) - BC:{self.BC}\n"
 
 @dataclass
 class GlobalData:
@@ -32,6 +32,11 @@ class Grid:
     nodes: List[Node] = field(default_factory=list)
     elements: List[Element] = field(default_factory=list)
     bc_nodes: List[int] = field(default_factory=list)
+
+    gen_elements: List[int] = field(default_factory=list)
+    w_f_elements: List[int] = field(default_factory=list)
+    w_in_elements: List[int] = field(default_factory=list)
+    w_out_elements: List[int] = field(default_factory=list)
 
 global_data = GlobalData()
 grid_data = Grid()
