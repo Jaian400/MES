@@ -10,7 +10,6 @@ def visualize_heatmap(grid, t):
     poly_colors = []
 
     for elem in grid.elements:
-        # 1. Pobierz współrzędne węzłów elementu
         vertices = []
         elem_temps = []
         
@@ -21,31 +20,21 @@ def visualize_heatmap(grid, t):
         
         verts.append(vertices)
         
-        # 3. Oblicz średnią temperaturę elementu
         avg_temp = sum(elem_temps) / len(elem_temps)
         poly_colors.append(avg_temp)
 
-    # 4. Tworzenie kolekcji
     p = PolyCollection(verts, cmap=cm.jet, edgecolor='black', linewidths=0.5)
     
-    # Przypisanie kolorów
     p.set_array(poly_colors)
     
-    # --- KLUCZOWA ZMIANA TUTAJ ---
-    # Ustawiamy sztywne granice skali kolorów od 0 do 25
     p.set_clim(vmin=0, vmax=40) 
     # -----------------------------
     
-    # Dodanie kolekcji do wykresu
     ax.add_collection(p)
 
-    # 5. Dodanie paska kolorów
-    # Opcja extend='max' dodaje strzałkę na górze paska,
-    # sygnalizując, że są wartości wykraczające poza skalę (powyżej 25 stopni)
     cbar = fig.colorbar(p, ax=ax, extend='max') 
     cbar.set_label('Temperatura [$^\circ$C]', rotation=270, labelpad=15)
 
-    # Ustawienia widoku
     ax.set_aspect('equal')
     ax.autoscale_view()
     ax.set_xlabel('X')
