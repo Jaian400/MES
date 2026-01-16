@@ -59,8 +59,11 @@ class SystemOfEquation:
         # print(f"{left}")
         right = self.P + np.inner(t0, new_C)
         # print(f"{right}")
-        self.t = np.linalg.solve(left, right)
-        # self.t = spsolve(csc_array(left), csr_array(right))
+        # self.t = np.linalg.solve(left, right)
+        self.t = spsolve(csc_array(left), csr_array(right))
+    
+    def solve_steady_state(self):
+        self.t = spsolve(csc_array(self.H), csr_array(self.P))
     
     def __repr__(self):
         return f"\nt1: {self.t}\n"
@@ -70,21 +73,21 @@ def calculate_elements(elements, nodes, elem_univ):
     alfa = global_data.Alfa
     for e in elements:
         if e.material_type == 0: # POWIETRZE
-            cond = 2.0 # uwazac z tym, standard: 0.026
+            cond = 8.0 # uwazac z tym, standard: 0.026
             dens = 1.2      
             spec_heat = 1005 
         elif e.material_type == 1: # PIEC
-            cond = 1.5     
-            dens = 2200     
-            spec_heat = 1000  
+            cond = 1.4     
+            dens = 700 # 2100 baza / 3     
+            spec_heat = 920  
         elif e.material_type == 2: # SC WEWN
-            cond = 0.8      
-            dens = 1600     
-            spec_heat = 850   
+            cond = 0.13 # 0.13 baza
+            dens = 200 # 0.12/0.3 * 500
+            spec_heat = 1600   
         elif e.material_type == 3: # SC ZEWN
-            cond = 1.2    
-            dens = 2100     
-            spec_heat = 840 
+            cond = 0.13
+            dens = 500     
+            spec_heat = 1600 
 
         e.calculate_jacobians(nodes, elem_univ)
         e.calculate_H(cond, elem_univ, dens, spec_heat)
@@ -103,11 +106,12 @@ def calculate_state(matrixes, t0):
 if __name__ == "__main__":
     # file_path = "Test_q_gen_big.txt"
     # file_path = "Test_q_gen.txt"
-    file_path = "Problem_dom.txt"
+    # file_path = "Problem_dom.txt"
+    file_path = "Problem_dom_2_0.txt"
 
     load_data(file_path)
 
-    npc = 2
+    npc = 4
     global_data.npc = npc
 
     if global_data and grid_data:
@@ -144,7 +148,7 @@ if __name__ == "__main__":
 
     # WIELKOSC GRZANIA
     for e_id in grid_data.gen_elements:
-        grid_data.elements[e_id - 1].Q_gen = 5000
+        grid_data.elements[e_id - 1].Q_gen = 8000 # 14000 vs 8000 baza
     
     calculate_elements(grid_data.elements, grid_data.nodes, elem_univ)
     # print(grid_data.elements)
@@ -152,6 +156,11 @@ if __name__ == "__main__":
     matrixes = MatrixGlobal()
     matrixes.calculate()
     # print(matrixes)
+
+    # sys = SystemOfEquation(matrixes, grid_data.nN)
+    # sys.solve_steady_state()
+    # visualize_heatmap(grid_data, sys.t)
+    # exit(0)
 
     # ZBIERANE DANE ------------------
 
@@ -196,7 +205,7 @@ if __name__ == "__main__":
     # Wykres średniej temperatury powietrza
     plot = sns.lineplot(data=df, x="Time", y="Temp_Avg_Powietrze", color="blue", linewidth=2.5)
 
-    plt.title("Zmiana temperatury powietrza w czasie", fontsize=15)
+    plt.title("Zmiana średniej temperatury powietrza w czasie", fontsize=15)
     plt.xlabel("Czas [s]", fontsize=12)
     plt.ylabel("Temperatura [st.C]", fontsize=12)
     plt.savefig(f'temp_in_time.png', dpi=300)
@@ -204,17 +213,3 @@ if __name__ == "__main__":
     # visualize_grid(grid_data)
     # print(t0)
     # print(global_data)
-    exit(0)
-
-    # print("\n\nCALKOWANIE")
-    # calka = V_ff()
-
-    # f1 = lambda x:5*np.pow(x, 2) + 3*x + 6
-    # f2 = lambda y, x: 5 * np.power(x,2) * np.power(y,2) + 3*x*y + 6
-
-    # calka.quadrature(f2, -1, 1)
-    # print(calka.output)
-
-    # dblquad_, error = dblquad(f2, -100, 100, lambda x: -1, lambda x: 2)
-    # print(f"dblquad: {dblquad_}")
-    # print(f"roznica miedzy V_ff a dblquad: {100 * abs(calka.output - dblquad_)/calka.output} %")

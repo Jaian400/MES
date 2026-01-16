@@ -55,8 +55,8 @@ class SystemOfEquation:
         # print(f"{left}")
         right = self.P + np.inner(t0, new_C)
         # print(f"{right}")
-        self.t = np.linalg.solve(left, right)
-        # self.t = spsolve(csc_array(left), csr_array(right))
+        # self.t = np.linalg.solve(left, right)
+        self.t = spsolve(csc_array(left), csr_array(right))
     
     def __repr__(self):
         return f"\nt1: {self.t}\n"
@@ -135,8 +135,9 @@ if __name__ == "__main__":
     end = time.time()
 
     print("Czas obliczeń:", end - start, "s")
+    # print(t0)
 
-    # visualize_grid(grid_data)
+    visualize_grid(grid_data)
     visualize_heatmap(grid_data, t0)
     exit(0)
 

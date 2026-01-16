@@ -8,11 +8,11 @@ class Jacobian:
         self.detJ = 0.0
 
     def calculate(self, dN_dksi_row, dN_deta_row, element_nodes_coords):
-        self.J[0, 0] = np.dot(dN_dksi_row, element_nodes_coords[:, 0]) # lewy gorny - x po ksi
-        self.J[0, 1] = np.dot(dN_dksi_row, element_nodes_coords[:, 1]) # prawy gorny - y po ksi
+        self.J[0, 0] = np.dot(dN_dksi_row, element_nodes_coords[:, 0])
+        self.J[0, 1] = np.dot(dN_dksi_row, element_nodes_coords[:, 1]) 
 
-        self.J[1, 0] = np.dot(dN_deta_row, element_nodes_coords[:, 0]) # lewy dolny - x po eta
-        self.J[1, 1] = np.dot(dN_deta_row, element_nodes_coords[:, 1]) # prawy dolny - y po eta
+        self.J[1, 0] = np.dot(dN_deta_row, element_nodes_coords[:, 0])
+        self.J[1, 1] = np.dot(dN_deta_row, element_nodes_coords[:, 1])
 
         self.detJ = np.linalg.det(self.J)
         self.J1 = np.linalg.inv(self.J)
@@ -33,14 +33,14 @@ class Element:
 
     def calculate_jacobians(self, nodes_all, elem_univ:ElemUniv):
         self.jacobians.clear()
-        # uwaga id zaczyna sie od 1; tu mamy kolejne polozenia wezlow
+        # uwaga id zaczyna sie od 1
         element_nodes_coords = np.array([
             [nodes_all[node_id - 1].x, nodes_all[node_id - 1].y] 
             for node_id in self.node_ids
         ])
 
         for pc in range(elem_univ.npc):
-            dN_dksi_row = elem_univ.dN_dksi[pc] # jeden wiersz to input do iloczynu w jaco, dane pc to dany wiersz
+            dN_dksi_row = elem_univ.dN_dksi[pc] 
             dN_deta_row = elem_univ.dN_deta[pc]
             
             jacobian = Jacobian()

@@ -8,7 +8,14 @@ def integration_scheme(npc_1d):
         x = [-np.sqrt(3.0/5.0), 0.0, np.sqrt(3.0/5.0)]
         w = [5/9, 8/9, 5/9]
     elif npc_1d == 4:
-        pass # dolozyc schemat
+        x1 = np.sqrt((3.0 - 2.0 * np.sqrt(6.0 / 5.0)) / 7.0)
+        x2 = np.sqrt((3.0 + 2.0 * np.sqrt(6.0 / 5.0)) / 7.0)
+        
+        w1 = (18.0 + np.sqrt(30.0)) / 36.0
+        w2 = (18.0 - np.sqrt(30.0)) / 36.0
+        
+        x = [-x2, -x1, x1, x2]
+        w = [w2, w1, w1, w2]
     
     return x, w
 
